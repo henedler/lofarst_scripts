@@ -1,0 +1,24 @@
+# Direction-dependent scalar amplitudes per snapshot (solint = 1 XST snapshot, all its channels),
+# one model column per direction. All dipoles are constrained to the same solution
+# (sol.antennaconstraint is set by the pipeline from the MS antenna table):
+# the scintillation pattern (~0.5-1 km) is much larger than the station.
+# The solution on a visibility is g_p g_q* = g^2, i.e. a flux-density factor.
+msin =
+msin.datacolumn = SCALARPHASE_DATA
+msout = .
+
+steps = [sol]
+
+sol.type = ddecal
+sol.solveralgorithm = directioniterative
+sol.mode = scalaramplitude
+sol.uvmmin = 15
+sol.h5parm = cal-scint.h5
+sol.minvisratio = 0.0001
+sol.tolerance = 1e-5
+sol.maxiter = 200
+sol.nchan = 0
+sol.solint = 1
+sol.propagatesolutions = True
+sol.propagateconvergedonly = False
+sol.modeldatacolumns = [MODEL_CASA,MODEL_CYGA,MODEL_SKY]

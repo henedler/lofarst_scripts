@@ -1,0 +1,27 @@
+# Scale one model column by the scintillation of its direction relative to the diffuse sky:
+#   out = in * g_dir^2 / g_SKY^2
+# corrupt: multiply by the solution of the direction (invert = false)
+# norm:    divide by the solution of the diffuse sky (invert = true); the diffuse sky does not
+#          scintillate, so g_SKY holds the instrument gain and sky-model scale of the snapshot,
+#          which must stay in the data for the bandpass solve.
+# The pipeline sets msin.datacolumn, msout.datacolumn, *.parmdb and corrupt.direction.
+msin =
+msin.datacolumn =
+msout = .
+msout.datacolumn =
+
+steps = [corrupt, norm]
+
+corrupt.type = applycal
+corrupt.parmdb =
+corrupt.correction = amplitude000
+corrupt.direction =
+corrupt.invert = false
+corrupt.updateweights = false
+
+norm.type = applycal
+norm.parmdb =
+norm.correction = amplitude000
+norm.direction = [MODEL_SKY]
+norm.invert = true
+norm.updateweights = false

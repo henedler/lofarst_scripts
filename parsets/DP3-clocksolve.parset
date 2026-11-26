@@ -1,0 +1,21 @@
+msin =
+msin.datacolumn = DATA
+msout = .
+
+steps = [sol]
+
+sol.type = ddecal
+sol.solveralgorithm = directioniterative # needed for sol.datause
+
+sol.mode = leakage
+sol.uvlambdamin = 5
+sol.h5parm=cal-leak.h5
+sol.minvisratio = 0.0001
+sol.tolerance = 1e-5
+sol.maxiter = 100
+sol.nchan = 1
+sol.solint = 30
+sol.propagatesolutions = True
+sol.propagateconvergedonly = False
+sol.modeldatacolumns=[MODEL_DATA]
+

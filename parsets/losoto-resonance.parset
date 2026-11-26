@@ -1,0 +1,10 @@
+# Fit the X-Y resonance to the full-Jones solutions (losoto RESONANCE operation)
+Ncpu = 0
+
+[resonance]
+soltab = sol000/amplitude000
+operation = RESONANCE
+soltabsOut = [amplitudeResonance,phaseResonance]
+outFile = resonance_fit.txt
+nRes = 1
+freqRange = [45e6,0]

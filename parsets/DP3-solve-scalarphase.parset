@@ -1,0 +1,21 @@
+# Temporary per-dipole phases (one per channel) against the summed sky model.
+# Only used to make the data coherent for the direction-dependent amplitude solve.
+msin =
+msin.datacolumn = DATA
+msout = .
+
+steps = [sol]
+
+sol.type = ddecal
+sol.solveralgorithm = directioniterative
+sol.mode = scalarphase
+sol.uvmmin = 15
+sol.h5parm = cal-scalarphase.h5
+sol.minvisratio = 0.0001
+sol.tolerance = 1e-5
+sol.maxiter = 100
+sol.nchan = 1
+sol.solint = 30
+sol.propagatesolutions = True
+sol.propagateconvergedonly = False
+sol.modeldatacolumns = [MODEL_DATA_SUM]

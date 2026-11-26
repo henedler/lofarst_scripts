@@ -28,9 +28,27 @@ per XST subband at its own snapshot time) are then
 Only the channels that hold data in a snapshot are predicted. Fully flagged
 rows get a zero model.
 
+Output columns (one per sky component, for direction-dependent solves, e.g.
+DP3 ddecal with modeldatacolumns=[MODEL_CASA,MODEL_CYGA,MODEL_SKY]):
+  --split-columns "Cas A=MODEL_CASA,Cyg A=MODEL_CYGA,SKY=MODEL_SKY" (default)
+maps lofstatcal components to MS columns. SKY is the diffuse LFSM sky, from
+which every modelled compact source is cut out (pixels within 3 deg replaced
+by the mean within 5 deg, lofstatcal's subtract_compact_sources_from_pygdsm_map),
+so each part of the sky is in exactly one column. Components that are not
+mapped (e.g. the Sun) are added to the SKY column. Every component is
+multiplied by the EEPs separately. --column NAME additionally writes the sum
+of all components; --split-columns NONE writes only that sum (old behaviour).
+
+lofstatcal cuts a compact source out of the diffuse map only while it is
+above object_elevation_cutoff (default 20 deg in lofstatcal); below that it
+would stay in the LFSM and land in the SKY column. This script therefore sets
+the source and diffuse-sky elevation cutoffs to the same value
+(--elevation-cutoff, default 5 deg), so a source is either its own component
+or below the horizon of the model.
+
 Usage:
-    predict_lfsm_ms.py MS [--column MODEL_DATA] [--model-source EEP]
-                          [--sources "Cas A,Cyg A"] [--bodies SUN] [--sky-nside 32]
+    predict_lfsm_ms.py MS [--split-columns ...] [--column MODEL_DATA] [--model-source EEP]
+                          [--sources "Cas A,Cyg A"] [--bodies SUN] [--sky-nside 64]
                           [--no-diffuse-sky] [--processes 1] [--no-conjugate]
 
 The EEP model needs the same set-up as lofstatcal itself: EEP files in EEP_DIR
@@ -56,11 +74,11 @@ def jy_per_kelvin(pixel_area_deg2, freq_MHz):
     return 1.0 / kelvin_to_Jy(1.0, pixel_area_deg2, freq_MHz)
 
 
-def ensure_column(ms, column):
+def ensure_column(ms, column, comment="lofstatcal sky x EEP model (predict_lfsm_ms.py)"):
     if column in ms.colnames():
         return
     desc = ms.getcoldesc("DATA")
-    desc["comment"] = "lofstatcal sky x EEP model (predict_lfsm_ms.py)"
+    desc["comment"] = comment
     ms.addcols(ct.maketabdesc(ct.makecoldesc(column, desc)))
     print(f"added column {column}")
 
@@ -77,7 +95,13 @@ def run_worker(config, inputs, worker_id):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("ms")
-    ap.add_argument("--column", default="MODEL_DATA")
+    ap.add_argument("--split-columns", default="Cas A=MODEL_CASA,Cyg A=MODEL_CYGA,SKY=MODEL_SKY",
+                    help="component=COLUMN pairs; SKY = diffuse sky + all unmapped components; NONE = no split")
+    ap.add_argument("--column", default=None,
+                    help="also write the sum of all components to this column (default: MODEL_DATA if "
+                         "--split-columns NONE, otherwise not written)")
+    ap.add_argument("--elevation-cutoff", type=float, default=5.0,
+                    help="elevation (deg) below which neither compact sources nor diffuse-sky pixels are modelled")
     ap.add_argument("--station", help="station name, e.g. CS002 or CS002LBA (default: from the MS)")
     ap.add_argument("--antenna-set", default="LBA")
     ap.add_argument("--antenna-band", default="10_90", help="filter, for lofstatcal's subband frequencies")
@@ -87,7 +111,8 @@ def main():
     ap.add_argument("--sources", default="Cas A,Cyg A",
                     help="comma-separated lofstatcal source names (Cas A, Cyg A, Tau A, Vir A) or NONE")
     ap.add_argument("--bodies", default="SUN", help="comma-separated solar-system bodies (SUN, MOON, JUPITER) or NONE")
-    ap.add_argument("--sky-nside", type=int, default=32, help="healpix resolution of the diffuse sky (lofstatcal default 32)")
+    ap.add_argument("--sky-nside", type=int, default=64,
+                    help="healpix resolution of the diffuse sky (default 64 = native grid of the 5.1 deg LFSM; lofstatcal default 32; ~3 GB per process)")
     ap.add_argument("--no-diffuse-sky", action="store_true", help="only the compact sources, no LFSM")
     ap.add_argument("--single-antenna-sampling", default=-1,
                     help="lofstatcal single_antenna_sampling (-1: every antenna its own EEP)")
@@ -101,7 +126,7 @@ def main():
     from lofstatcal.misc.stations import get_station_baselines, get_station_earthlocation
     from lofstatcal.misc.freq_and_sb import frequency_from_subband
 
-    split = lambda s: [x.strip() for x in s.split(",") if x.strip()]
+    split = lambda s: [x.strip() for x in s.split(",") if x.strip() and x.strip().upper() != "NONE"]
     config, unparsed = generate_default_calibration_configuration({
         "source_names": split(args.sources),
         "body_names": split(args.bodies),
@@ -111,7 +136,28 @@ def main():
         "use_diffuse_sky": not args.no_diffuse_sky,
         "single_antenna_sampling": args.single_antenna_sampling,
         "solar_flux_scaling": SFU_TO_JY,                                   # lofstatcal's Sun is in SFU
+        "object_elevation_cutoff": args.elevation_cutoff,                  # same horizon for sources and
+        "diffuse_sky_elevation_cutoff": args.elevation_cutoff,             # diffuse sky (see docstring)
     })
+
+    # ---- output columns: component name -> column
+    colmap = {}
+    for item in split(args.split_columns):
+        if "=" not in item:
+            raise SystemExit(f"--split-columns: expected component=COLUMN, got {item!r}")
+        comp, col = (x.strip() for x in item.split("=", 1))
+        colmap[comp] = col
+    if colmap:
+        known = set(config["source_names"]) | {b.upper() for b in config["body_names"]} | {"SKY"}
+        unknown = [c for c in colmap if c not in known and c.upper() not in known]
+        if unknown:
+            raise SystemExit(f"--split-columns: {unknown} are not modelled components ({sorted(known)})")
+        if "SKY" not in colmap:
+            raise SystemExit("--split-columns needs a SKY=COLUMN entry (diffuse sky and unmapped components)")
+        if "SKY" in colmap and args.no_diffuse_sky:
+            print("note: --no-diffuse-sky, so the SKY column only holds unmapped compact components (if any)")
+    total_column = args.column if args.column else (None if colmap else "MODEL_DATA")
+    out_columns = list(dict.fromkeys(list(colmap.values()) + ([total_column] if total_column else [])))
 
     ms = ct.table(args.ms, readonly=False, ack=False)
     ant = ct.table(args.ms + "/ANTENNA", ack=False)
@@ -126,7 +172,9 @@ def main():
         raise SystemExit(f"lofstatcal has {baselines.shape[0]} antennas for {field}, the MS has {nant}")
     spw = ct.table(args.ms + "/SPECTRAL_WINDOW", ack=False)
     ddesc = ct.table(args.ms + "/DATA_DESCRIPTION", ack=False).getcol("SPECTRAL_WINDOW_ID")
-    ensure_column(ms, args.column)
+    for col in out_columns:
+        ensure_column(ms, col, "lofstatcal sky x EEP model (predict_lfsm_ms.py)" if col == total_column else
+                      "lofstatcal model of " + ", ".join(k for k, v in colmap.items() if v == col) + " x EEP (predict_lfsm_ms.py)")
 
     # ---- one lofstatcal input per (snapshot, channel with data)
     times = ms.getcol("TIME")
@@ -172,7 +220,10 @@ def main():
     print(f"{args.ms}: {field}, {len(blocks)} snapshots, {len(inputs)} channels to predict; "
           f"model_source={config['model_source'] if config['use_eeps'] else 'none'}, "
           f"diffuse={config['use_diffuse_sky']} (nside {config['sky_nside']}), "
-          f"sources={config['source_names']}, bodies={config['body_names']}")
+          f"sources={config['source_names']}, bodies={config['body_names']}, "
+          f"elevation cutoff {args.elevation_cutoff} deg")
+    print("output: " + ", ".join([f"{k} -> {v}" for k, v in colmap.items()] +
+                                 ([f"sum -> {total_column}"] if total_column else [])))
 
     # ---- lofstatcal model (its own tqdm progress bars)
     if args.processes > 1:
@@ -192,25 +243,52 @@ def main():
     if config["use_diffuse_sky"]:
         import healpy
         pixel_area = healpy.nside2pixarea(config["sky_nside"], degrees=True)
-    model_blocks = {ib: np.zeros((b[1], len(b[3]), 4), dtype=np.complex64) for ib, b in enumerate(blocks)}
     a1_all = ms.getcol("ANTENNA1")
     a2_all = ms.getcol("ANTENNA2")
     uvw_w = ms.getcol("UVW")[:, 2]
+
+    def column_of(comp):
+        if comp in colmap:
+            return colmap[comp]
+        if comp.upper() in colmap:
+            return colmap[comp.upper()]
+        return colmap["SKY"]
+
+    by_block = {}
     for (ib, c), res in zip(where, results):
-        r0, nrow, row_ok, freqs = blocks[ib]
-        f = freqs[c]
-        R = sum(res["model_vis_sources"].values())                           # (nant, nant, 2, 2), raw convention
-        # lofstatcal: Kelvin per pixel (diffuse sky on) or Jy (off), flux split over the two pols
-        scale = 2.0 * (jy_per_kelvin(pixel_area, f / 1e6) if pixel_area else 1.0)
+        by_block.setdefault(ib, []).append((c, res))
+    seen = {}                                                                # component -> number of channels
+    for ib, (r0, nrow, row_ok, freqs) in enumerate(blocks):
+        out = {col: np.zeros((nrow, len(freqs), 4), dtype=np.complex64) for col in out_columns}
         a1 = a1_all[r0:r0 + nrow][row_ok]
         a2 = a2_all[r0:r0 + nrow][row_ok]
-        v = scale * R[a1, a2].reshape(-1, 4)                                 # XX, XY, YX, YY
-        v = v * np.exp(2j * np.pi * uvw_w[r0:r0 + nrow][row_ok] * f / C_LIGHT)[:, None]   # as xst2ms
-        model_blocks[ib][row_ok, c] = np.conj(v) if args.conjugate else v
-    for ib, (r0, nrow, _, _) in enumerate(blocks):
-        ms.putcol(args.column, model_blocks[ib], r0, nrow)
+        for c, res in by_block.get(ib, []):
+            f = freqs[c]
+            # lofstatcal: Kelvin per pixel (diffuse sky on) or Jy (off), flux split over the two pols
+            scale = 2.0 * (jy_per_kelvin(pixel_area, f / 1e6) if pixel_area else 1.0)
+            rot = np.exp(2j * np.pi * uvw_w[r0:r0 + nrow][row_ok] * f / C_LIGHT)[:, None]   # as xst2ms
+            for comp, R in res["model_vis_sources"].items():                 # R: (nant, nant, 2, 2), raw convention
+                seen[comp] = seen.get(comp, 0) + 1
+                v = scale * R[a1, a2].reshape(-1, 4) * rot                   # XX, XY, YX, YY
+                if args.conjugate:
+                    v = np.conj(v)
+                if colmap:
+                    out[column_of(comp)][row_ok, c] += v
+                if total_column:
+                    out[total_column][row_ok, c] += v
+        for col in out_columns:
+            ms.putcol(col, out[col], r0, nrow)
     ms.close()
-    print(f"wrote {args.column}")
+    nch = len(where)
+    for comp, n in sorted(seen.items()):
+        print(f"  {comp}: in {n}/{nch} channels -> {column_of(comp) if colmap else total_column}")
+    for comp in colmap:
+        if comp != "SKY" and not any(k == comp or k.upper() == comp.upper() for k in seen):
+            print(f"  WARNING: {comp} was never above {args.elevation_cutoff} deg: {colmap[comp]} is zero")
+        elif comp != "SKY" and seen.get(comp, seen.get(comp.upper(), 0)) < nch:
+            print(f"  note: {comp} is below {args.elevation_cutoff} deg for part of the observation "
+                  f"(zero model there)")
+    print("wrote " + ", ".join(out_columns))
 
 
 if __name__ == "__main__":
