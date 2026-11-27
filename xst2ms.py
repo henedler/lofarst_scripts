@@ -55,6 +55,9 @@ import h5py
 import numpy as np
 import erfa
 from astropy.time import Time
+import astropy
+from astropy.utils.iers import conf
+conf.auto_max_age = None
 from casacore import tables as ct
 
 C_LIGHT = 299792458.0

@@ -1,0 +1,14 @@
+# Advanced resonance model: two resonances plus a cubic complex background leakage, all frequencies.
+# Robust (soft-L1) fit, so single bad channels or snapshots do not pull the fit.
+Ncpu = 0
+
+[resonanceAdvanced]
+soltab = sol000/amplitude000
+operation = RESONANCE
+soltabsOut = [amplitudeResAdvanced,phaseResAdvanced]
+outFile = resonance_fit_advanced.txt
+nRes = 2
+freqRange = [0,0]
+bgOrder = 3
+robust = True
+ncpu = 0

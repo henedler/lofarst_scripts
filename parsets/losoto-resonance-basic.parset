@@ -1,0 +1,13 @@
+# Basic resonance model: one resonance, no background leakage (bgOrder = -1), all frequencies.
+# Robust (soft-L1) fit, so single bad channels or snapshots do not pull the fit.
+Ncpu = 0
+
+[resonanceBasic]
+soltab = sol000/amplitude000
+operation = RESONANCE
+soltabsOut = [amplitudeResBasic,phaseResBasic]
+outFile = resonance_fit_basic.txt
+nRes = 1
+freqRange = [0,0]
+bgOrder = -1
+robust = True

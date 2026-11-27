@@ -1,0 +1,18 @@
+# Resonance model soltabs written by the RESONANCE operation (Hermitian leakage matrix [[1, k], [k*, 1]])
+Ncpu = 0
+
+[plotResAmp]
+operation = PLOT
+soltab = sol000/amplitudeResonance
+axesInPlot = [freq]
+axisInTable = ant
+prefix = plots/res-amp-
+minmax = [0.0,1.2]
+
+[plotResPh]
+operation = PLOT
+soltab = sol000/phaseResonance
+axesInPlot = [freq]
+axisInTable = ant
+prefix = plots/res-ph-
+minmax = [-3.14,3.14]

@@ -1,0 +1,18 @@
+# Advanced resonance model soltabs written by RESONANCE (Hermitian leakage matrix [[1, k], [k*, 1]])
+Ncpu = 0
+
+[plotResAmp]
+operation = PLOT
+soltab = sol000/amplitudeResAdvanced
+axesInPlot = [freq]
+axisInTable = ant
+prefix = plots/res-advanced-amp-
+minmax = [0.0,1.2]
+
+[plotResPh]
+operation = PLOT
+soltab = sol000/phaseResAdvanced
+axesInPlot = [freq]
+axisInTable = ant
+prefix = plots/res-advanced-ph-
+minmax = [-3.14,3.14]

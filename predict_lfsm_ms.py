@@ -61,6 +61,9 @@ import sys
 
 import numpy as np
 from casacore import tables as ct
+import astropy
+from astropy.utils.iers import conf
+conf.auto_max_age = None
 
 C_LIGHT = 299792458.0
 SB_WIDTH = 100e6 / 512                     # LBA (10_90 / 30_90), 200 MHz clock
@@ -88,6 +91,8 @@ def mjd_seconds_to_datetime(t):
 
 
 def run_worker(config, inputs, worker_id):
+    from astropy.utils.iers import conf                                     # also in joblib worker processes
+    conf.auto_max_age = None
     from lofstatcal.visibility.model import worker_generate_corrected_visibilities
     return worker_generate_corrected_visibilities(config, inputs, worker_id)
 

@@ -1,4 +1,7 @@
 # Fit the X-Y resonance to the full-Jones solutions (losoto RESONANCE operation)
+# Minimal model: one resonance, no background leakage (bgOrder = -1), fitted over all frequencies.
+# Robust (soft-L1) fit, so single bad channels or snapshots do not pull the fit.
+# More complete alternative: bgOrder = 3 (cubic complex background) and/or nRes = 2.
 Ncpu = 0
 
 [resonance]
@@ -7,4 +10,6 @@ operation = RESONANCE
 soltabsOut = [amplitudeResonance,phaseResonance]
 outFile = resonance_fit.txt
 nRes = 1
-freqRange = [45e6,0]
+freqRange = [0,0]
+bgOrder = -1
+robust = True

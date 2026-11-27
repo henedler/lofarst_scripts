@@ -1,0 +1,11 @@
+# Temporary scalar phases (step 2 of calibrate_xst.py) that are applied before the scintillation solve
+Ncpu = 0
+
+[plotScalarphase]
+operation = PLOT
+soltab = sol000/phase000
+axesInPlot = [freq]
+axisInTable = ant
+prefix = plots/scalarphase-
+refAnt = auto
+minmax = [-3.14,3.14]
