@@ -240,6 +240,20 @@ The all-sky images of the two observations show how different the two skies are.
 - **Diffuse sky:** an average over many directions, so its resonance looks smeared and multi-peaked.
 - **Effect on the direction-independent solve:** it sees a brightness-weighted mixture of these directions. A different sky gives a different mixture and thus a different apparent resonance, which explains the differences between observations.
 
+Figures 8–10 show the XY amplitude of the direction-dependent full-Jones solutions for all 96 dipoles, one figure per direction, from the same observation.
+
+![XY amplitude, direction Cas A](figures/ddfj_XY_casa.png)
+
+*Figure 8: XY amplitude of the direction-dependent full-Jones solutions towards Cas A, per dipole, versus frequency (30–67 MHz).*
+
+![XY amplitude, direction Cyg A](figures/ddfj_XY_cyga.png)
+
+*Figure 9: the same towards Cyg A.*
+
+![XY amplitude, direction diffuse sky](figures/ddfj_XY_sky.png)
+
+*Figure 10: the same for the diffuse sky.*
+
 **A possible model.** If this holds up, the leakage could be written as one resonance per dipole, scaled by a complex factor per direction, plus a direction-dependent background:
 
 ```math
